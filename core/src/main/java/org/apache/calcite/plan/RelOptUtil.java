@@ -3515,7 +3515,16 @@ public abstract class RelOptUtil {
     }
   }
 
-  public static boolean isNonEquiJoinRelRule(JoinInfo joinInfo, LogicalJoin join) {
+  public static RexNode convertCastCondition(Join join) {
+    RexNode joinCond = join.getCondition();
+    // OVERRIDE POINT
+    if (RelOptUtil.containCast(joinCond)) {
+      return convertCastCondition(joinCond);
+    }
+    return joinCond;
+  }
+
+  public static boolean isNonEquiJoinRel(JoinInfo joinInfo, LogicalJoin join) {
     RelNode left = join.getLeft();
     RelNode right = join.getRight();
     return isNonEquiJoinRel(joinInfo, left, right, join.getJoinType(), join.getCondition());
