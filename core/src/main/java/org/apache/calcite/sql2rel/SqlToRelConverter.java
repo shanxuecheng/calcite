@@ -197,6 +197,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -2566,6 +2567,7 @@ public class SqlToRelConverter {
     }
 
     // OVERRIDE POINT
+    LinkedList<RexNode> equalWithCastList = null;
     if (RelOptUtil.containCast(joinCond)) {
       RexNode newJoinCond = RelOptUtil.convertCastCondition(joinCond);
       // non-equi-join need not convert cast
@@ -2573,6 +2575,8 @@ public class SqlToRelConverter {
       boolean isNonEquiJoin =
               RelOptUtil.isNonEquiJoinRel(info, leftRel, rightRel, joinType, newJoinCond);
       if (!isNonEquiJoin || (isNonEquiJoin && isConvertCastForNonEquiJoinEnabled())) {
+        equalWithCastList = new LinkedList<>();
+        collectEqualWithCastRexNodes(leftRel, rightRel, joinCond, equalWithCastList);
         joinCond = newJoinCond;
       }
     }
@@ -2581,7 +2585,73 @@ public class SqlToRelConverter {
         (Join) RelFactories.DEFAULT_JOIN_FACTORY.createJoin(leftRel, rightRel,
             joinCond, ImmutableSet.<CorrelationId>of(), joinType, false);
 
+    if ((originalJoin instanceof LogicalJoin) && (null != equalWithCastList)) {
+      ((LogicalJoin) originalJoin).setEqualWithCastRexNodes(equalWithCastList);
+    }
+
     return RelOptUtil.pushDownJoinConditions(originalJoin, relBuilder);
+  }
+
+  private void collectEqualWithCastRexNodes(RelNode leftRel, RelNode rightRel,
+                                            RexNode condition, List<RexNode> equalWithCastList) {
+    switch (condition.getKind()) {
+    case OR:
+    case AND:
+      RexCall call = (RexCall) condition;
+      List<RexNode> operands = Lists.newArrayList(call.getOperands());
+      for (RexNode operand : operands) {
+        collectEqualWithCastRexNodes(leftRel, rightRel, operand, equalWithCastList);
+      }
+      break;
+    case EQUALS:
+      RexCall rexCall = (RexCall) condition;
+      if (!checkEqualOfJoin(leftRel, rightRel, rexCall)) {
+        break;
+      }
+      List<RexNode> rexNodes = Lists.newArrayList(rexCall.getOperands());
+      RexNode operandLeft = rexNodes.get(0);
+      RexNode operandRight = rexNodes.get(1);
+      if (operandLeft.getKind() == SqlKind.CAST || operandRight.getKind() == SqlKind.CAST) {
+        equalWithCastList.add(rexCall);
+      } else {
+        equalWithCastList.add(null);
+      }
+      break;
+    default:
+    }
+  }
+
+  private boolean checkEqualOfJoin(RelNode leftRel, RelNode rightRel, RexCall rexCall) {
+    int leftFieldCount = leftRel.getRowType().getFieldCount();
+    int rightFieldCount = rightRel.getRowType().getFieldCount();
+    List<RexNode> rexNodes = Lists.newArrayList(rexCall.getOperands());
+    RexInputRef leftInput = getRexInputRefFromEqualOperand(rexNodes.get(0));
+    RexInputRef rightInput = getRexInputRefFromEqualOperand(rexNodes.get(1));
+    if (leftInput == null || rightInput == null) {
+      return false;
+    }
+    int leftIndex = leftInput.getIndex();
+    int rightIndex = rightInput.getIndex();
+    return (leftIndex >= 0 && leftIndex < leftFieldCount)
+            && (rightIndex >= leftFieldCount && rightIndex < leftFieldCount + rightFieldCount);
+  }
+
+  private RexInputRef getRexInputRefFromEqualOperand(RexNode operand) {
+    if (operand instanceof RexInputRef) {
+      return (RexInputRef) operand;
+    }
+    if (operand instanceof RexCall) {
+      RexCall rexCall = (RexCall) operand;
+      List<RexNode> operands = rexCall.getOperands();
+      if (operands == null || operands.size() != 1) {
+        return null;
+      }
+      RexNode expr = rexCall.getOperands().get(0);
+      if (expr instanceof RexInputRef) {
+        return (RexInputRef) expr;
+      }
+    }
+    return null;
   }
 
   private boolean isConvertCastForNonEquiJoinEnabled() {

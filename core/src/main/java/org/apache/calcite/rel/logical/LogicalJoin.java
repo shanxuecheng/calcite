@@ -33,6 +33,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
@@ -61,6 +62,9 @@ public final class LogicalJoin extends Join {
   private final boolean semiJoinDone;
 
   private final ImmutableList<RelDataTypeField> systemFieldList;
+
+  // equal with cast RexNodes in original join condition before 'cast' is removed
+  private LinkedList<RexNode> equalWithCastRexNodes;
 
   //~ Constructors -----------------------------------------------------------
 
@@ -176,9 +180,19 @@ public final class LogicalJoin extends Join {
   @Override public LogicalJoin copy(RelTraitSet traitSet, RexNode conditionExpr,
       RelNode left, RelNode right, JoinRelType joinType, boolean semiJoinDone) {
     assert traitSet.containsIfApplicable(Convention.NONE);
-    return new LogicalJoin(getCluster(),
+    LogicalJoin logicalJoin = new LogicalJoin(getCluster(),
         getCluster().traitSetOf(Convention.NONE), left, right, conditionExpr,
         variablesSet, joinType, semiJoinDone, systemFieldList);
+    logicalJoin.setEqualWithCastRexNodes(getEqualWithCastRexNodes());
+    return logicalJoin;
+  }
+
+  public void setEqualWithCastRexNodes(LinkedList<RexNode> equalWithCastRexNodes) {
+    this.equalWithCastRexNodes = equalWithCastRexNodes;
+  }
+
+  public LinkedList<RexNode> getEqualWithCastRexNodes() {
+    return this.equalWithCastRexNodes;
   }
 
   @Override public RelNode accept(RelShuttle shuttle) {
