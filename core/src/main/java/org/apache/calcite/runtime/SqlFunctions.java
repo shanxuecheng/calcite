@@ -2084,7 +2084,7 @@ public class SqlFunctions {
 
   /** SQL {@code REPLACE(string, search, replacement)} function. */
   public static String replace(String s, String search, String replacement) {
-    if (null == search || null == replacement) {
+    if (null == s || null == search || null == replacement) {
       return null;
     }
     return s.replace(search, replacement);
