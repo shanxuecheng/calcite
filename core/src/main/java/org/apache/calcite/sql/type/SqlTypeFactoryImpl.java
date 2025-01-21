@@ -176,7 +176,8 @@ public class SqlTypeFactoryImpl extends RelDataTypeFactoryImpl {
     return leastRestrictive(types, true);
   }
 
-  public @Nullable RelDataType leastRestrictive(List<RelDataType> types, boolean convertToVarying) {
+  public @Nullable RelDataType leastRestrictive(List<RelDataType> types, boolean convertToVarying,
+      boolean coerce) {
     assert types != null;
     assert types.size() >= 1;
 
@@ -186,13 +187,13 @@ public class SqlTypeFactoryImpl extends RelDataTypeFactoryImpl {
       if (resultType != null) {
         return resultType;
       }
-      return leastRestrictiveByCast(types);
+      return leastRestrictiveByCast(types, coerce);
     }
 
     return super.leastRestrictive(types);
   }
 
-  private @Nullable RelDataType leastRestrictiveByCast(List<RelDataType> types) {
+  private @Nullable RelDataType leastRestrictiveByCast(List<RelDataType> types, boolean coerce) {
     RelDataType resultType = types.get(0);
     boolean anyNullable = resultType.isNullable();
     for (int i = 1; i < types.size(); i++) {
@@ -206,10 +207,10 @@ public class SqlTypeFactoryImpl extends RelDataTypeFactoryImpl {
         anyNullable = true;
       }
 
-      if (SqlTypeUtil.canCastFrom(type, resultType, true)) {
+      if (SqlTypeUtil.canCastFrom(type, resultType, coerce)) {
         resultType = type;
       } else {
-        if (!SqlTypeUtil.canCastFrom(resultType, type, true)) {
+        if (!SqlTypeUtil.canCastFrom(resultType, type, coerce)) {
           return null;
         }
       }
