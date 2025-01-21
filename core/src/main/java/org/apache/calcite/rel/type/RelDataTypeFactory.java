@@ -206,7 +206,12 @@ public interface RelDataTypeFactory {
    * Calcite 1.30 Keeps the same changes with AL-5295 as the previous Calcite version
    * FYI: https://github.com/Kyligence/KAP/issues/13872
    */
-  @Nullable RelDataType leastRestrictive(List<RelDataType> types, boolean convertToVarying);
+  @Nullable
+  default RelDataType leastRestrictive(List<RelDataType> types, boolean convertToVarying) {
+    return leastRestrictive(types, convertToVarying, false);
+  }
+
+  @Nullable RelDataType leastRestrictive(List<RelDataType> types, boolean convertToVarying, boolean coerce);
 
   /**
    * Creates a SQL type with no precision or scale.

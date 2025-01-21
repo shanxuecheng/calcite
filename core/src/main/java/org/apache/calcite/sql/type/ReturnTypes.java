@@ -468,7 +468,7 @@ public abstract class ReturnTypes {
    */
   public static final SqlReturnTypeInference LEAST_RESTRICTIVE =
       opBinding -> opBinding.getTypeFactory().leastRestrictive(
-          opBinding.collectOperandTypes());
+          opBinding.collectOperandTypes(), true, true);
 
   /**
    * Returns the same type as the multiset carries. The multiset type returned
